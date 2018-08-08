@@ -36,6 +36,7 @@ Before you benchmark, you must have a stable environment to get repeatable resul
 - Watch out for power saving and thermal scaling.
 - Avoid virtual machines and shared cloud hosting; they are too noisy for consistent measurements.
 
+
 * Go's Test Package
 
 The testing package has built-in support for benchmarking  
@@ -48,3 +49,17 @@ The testing package has built-in support for benchmarking
 
 DEMO: go test -bench=. 
 
+
+* How Benchmark work
+
+- Each benchmark is run `b.N` times. By default go increases b.N till the benchmark function takes 1 second to complete.
+
+% go test -bench=. ./examples/factorial
+goos: linux
+goarch: amd64
+pkg: github.com/kanapuliAthavan/techxexotel/examples/factorial
+BenchmarkFactorial-4   	20000000	        60.1 ns/op
+PASS
+ok  	github.com/kanapuliAthavan/techxexotel/examples/factorial	1.270s
+
+- Run benchmarks longer to get more accuracy; `go`test`-benchtime=10s`
