@@ -1,0 +1,15 @@
+goos: linux
+goarch: amd64
+pkg: github.com/kanapuliAthavan/techxexotel/examples/fib
+BenchmarkFib-4   	  100000	     23704 ns/op
+BenchmarkFib-4   	   50000	     23717 ns/op
+BenchmarkFib-4   	  100000	     23665 ns/op
+BenchmarkFib-4   	  100000	     23721 ns/op
+BenchmarkFib-4   	   50000	     23829 ns/op
+BenchmarkFib-4   	  100000	     23792 ns/op
+BenchmarkFib-4   	  100000	     23656 ns/op
+BenchmarkFib-4   	   50000	     23744 ns/op
+BenchmarkFib-4   	   50000	     23944 ns/op
+BenchmarkFib-4   	   50000	     23674 ns/op
+PASS
+ok  	github.com/kanapuliAthavan/techxexotel/examples/fib	20.237s
