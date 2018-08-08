@@ -36,6 +36,15 @@ Before you benchmark, you must have a stable environment to get repeatable resul
 - Watch out for power saving and thermal scaling.
 - Avoid virtual machines and shared cloud hosting; they are too noisy for consistent measurements.
 
-If you can afford it, buy dedicated performance test hardware. Rack it, disable all the power management and thermal scaling and never update the software on those machines.
+* Go's Test Package
 
-For everyone else, have a before and after sample and run them multiple times to get consistent results.
+The testing package has built-in support for benchmarking  
+
+.code examples/factorial/factorial_test.go /STARTFAC OMIT/,/ENDFAC OMIT/
+.caption factorial.go
+
+.code examples/factorial/factorial_test.go /STARTBEN OMIT/,/ENDBEN OMIT/
+.caption factorial_benchmark.go
+
+DEMO: go test -bench=. 
+
