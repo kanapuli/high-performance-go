@@ -377,13 +377,4 @@ Don't leave complex code that is not performance critical, rewrite it with simpl
 
 Pay very close attention to allocations, avoid unnecessary allocation where possible.
 
-
-* And the Teacher's advice are 
-
-"I can make things very fast if they don't have to be correct."
-.caption Russ Cox
-
-"Readable means reliable"
-.caption Rob Pike
-
 Don't trade performance for reliability.
