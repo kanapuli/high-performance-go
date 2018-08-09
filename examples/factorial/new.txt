@@ -1,0 +1,15 @@
+goos: linux
+goarch: amd64
+pkg: github.com/kanapuliAthavan/techxexotel/examples/factorial
+BenchmarkFactorial-4   	  200000	      6962 ns/op
+BenchmarkFactorial-4   	  200000	      6979 ns/op
+BenchmarkFactorial-4   	  200000	      7038 ns/op
+BenchmarkFactorial-4   	  200000	      6980 ns/op
+BenchmarkFactorial-4   	  200000	      7000 ns/op
+BenchmarkFactorial-4   	  200000	      7001 ns/op
+BenchmarkFactorial-4   	  200000	      6957 ns/op
+BenchmarkFactorial-4   	  200000	      6998 ns/op
+BenchmarkFactorial-4   	  200000	      6979 ns/op
+BenchmarkFactorial-4   	  200000	      6962 ns/op
+PASS
+ok  	github.com/kanapuliAthavan/techxexotel/examples/factorial	14.734s

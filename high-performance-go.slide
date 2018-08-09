@@ -1,5 +1,5 @@
 High Performance Go
-Techx 2018🏴
+Techx Exotel 🏴
 09 Aug 2018
 
 Athavan Kanapuli
@@ -54,12 +54,336 @@ DEMO: go test -bench=.
 
 - Each benchmark is run `b.N` times. By default go increases b.N till the benchmark function takes 1 second to complete.
 
-% go test -bench=. ./examples/factorial
-goos: linux
-goarch: amd64
-pkg: github.com/kanapuliAthavan/techxexotel/examples/factorial
-BenchmarkFactorial-4   	20000000	        60.1 ns/op
-PASS
-ok  	github.com/kanapuliAthavan/techxexotel/examples/factorial	1.270s
+ % go test -bench=. ./examples/factorial
+ goos: linux
+ goarch: amd64
+ pkg: github.com/kanapuliAthavan/techxexotel/examples/factorial
+ BenchmarkFactorial-4   	20000000	        60.1 ns/op
+ PASS
+ ok  	 github.com/kanapuliAthavan/techxexotel/examples/factorial	1.270s
 
-- Run benchmarks longer to get more accuracy; `go`test`-benchtime=10s`
+- Run benchmarks longer to get more accuracy; 
+  go test -benchtime=10s
+- Benchmarks should be run multiple times to get an average result; 
+  go test -bench=. -count=10
+
+* Comparing Benchmarks 
+
+Determining the performance delta between two sets of benchmark is tedious 
+
+ % go test -bench=. -count=10 | tee old.txt
+
+DEMO: Improved Factorial code
+
+ % go test -bench=. -count=10 | tee new.txt
+
+Tools like [[https://godoc.org/rsc.io/benchstat][rsc.io/benchstat]] are useful in comparing the benchmarks
+
+ % go get -u rsc.io/benchstat
+ % benchstat {old,new}.txt
+
+ name         old time/op  new time/op  delta
+ Factorial-4  63.3ns ± 0%  60.0ns ± 0%  -5.20%  (p=0.000 n=10+10)
+
+* Avoid benchmarking start up costs
+
+Sometimes your benchmark has a once per run setup cost. `b.ResetTimer()` will can be used to ignore the time accrued in setup.
+
+.code examples/reset/reset.go /START1 OMIT/,/END1 OMIT/
+
+If you have some expensive setup logic _per_loop_iteration_, use `b.StopTimer()` and `b.StartTimer()` to pause the benchmark timer.
+
+.code examples/reset/reset.go /START2 OMIT/,/END2 OMIT/
+
+* Benchmarking allocations
+
+Allocation count and size is strongly correlated with benchmark time.
+
+You can tell the `testing` framework to record the number of allocations made by code under test.
+ 
+.code examples/benchmarks/benchmark.go
+
+* Avoid string concatenation
+
+Go strings are immutable. Concatenating two strings generates a third. Which of the following is fastest? 
+
+.code examples/concat/concat_test.go /START1 OMIT/,/END1 OMIT/
+.code examples/concat/concat_test.go /START2 OMIT/,/END2 OMIT/
+.code examples/concat/concat_test.go /START3 OMIT/,/END3 OMIT/
+.code examples/concat/concat_test.go /START4 OMIT/,/END4 OMIT/
+
+* Watch out for compiler optimisations
+
+This example comes from [[https://github.com/golang/go/issues/14813#issue-140603392][issue 14813]].
+
+.code examples/popcnt/popcnt_test.go /START OMIT/,/END OMIT/
+
+How fast will this function benchmark?
+
+ % go test -bench=. ./examples/popcnt
+
+* What happened?
+
+`popcnt` is a leaf function, so the compiler can inline it.
+
+Because the function is inlined, the compiler can see it has no side effects, so the call is eliminated. This is what the compiler sees:
+
+.code examples/popcnt/popcnt2_test.go /START OMIT/,/END OMIT/
+
+The same optimisations that make real code fast, by removing unnecessary computation, are the same ones that remove benchmarks that have no observable side effects.
+
+This is only going to get more common as the Go compiler improves.
+
+DEMO: show how to fix popcnt
+
+* Performance measurement and profiling
+
+* Performance measurement and profiling
+
+`testing.B` is useful for _microbenchmarks_.
+
+Microbenchmarks are useful for tuning the performance of a hot piece of code, but it's impractical (and unreliable) to write a `testing.B` benchmark for entire programs–you'd get more reliable results with `time(1)`.
+
+In this section we'll explore the profiling tools built into Go to investigate the operation of the program from the inside.
+
+* pprof
+
+The first tool we're going to be talking about today is _pprof_.
+
+[[https://github.com/google/pprof][pprof]] descends from the [[https://github.com/gperftools/gperftools][Google Perf Tools]] suite.
+
+`pprof` profiling is built into the Go runtime.
+
+It consists of two parts:
+
+- `runtime/pprof` package built into every Go program
+- `go`tool`pprof` for investigating profiles.
+
+* CPU profiling
+
+CPU profiling is the most common type of profile, and the most obvious. 
+
+When CPU profiling is enabled the runtime will interrupt itself every 10ms and record the stack trace of the currently running goroutines.
+
+Once the profile is complete we can analyse it to determine the hottest code paths.
+
+The more times a function appears in the profile, the more time that code path is taking as a percentage of the total runtime.
+
+* Memory profiling
+
+Memory profiling records the stack trace when a _heap_ allocation is made.
+
+Stack allocations are assumed to be free and are _not_tracked_ in the memory profile.
+
+
+* Other supported profiles
+
+Block profiling is similar to a CPU profile, but it records the amount of time a goroutine spent waiting for a shared resource.
+
+Block profiling can show you when a large number of goroutines _could_ make progress, but were _blocked_. This can be useful for determining _concurrency_ bottlenecks in your application. Blocking includes:
+
+- Sending or receiving on a unbuffered channel.
+- Sending to a full channel, receiving from an empty one.
+- Trying to `Lock` a `sync.Mutex` that is locked by another goroutine.
+
+`Mutex` `profiling` records the stack traces of the _holder_ of a contended mutex.
+
+`Thread` `creation` `profiling` records the stack traces that led to the creation of new OS threads.
+
+* Profiling applications
+
+The Go runtime's profiling interface is in the `runtime/pprof` package.
+
+`runtime/pprof` is a very low level tool, and for historic reasons the interfaces to the different kinds of profile are not uniform.
+
+A few years ago I wrote a small package, [[https://github.com/pkg/profile][github.com/pkg/profile]], to make it easier to profile an application.
+
+     import "github.com/pkg/profile"
+
+     func main() {
+                defer profile.Start().Stop()
+		           ...
+			        
+     }
+
+* Profiling godoc
+
+DEMO: add CPU profiling to `Homeopathix GO`.
+
+1. edit `cd ~/go/src/bitbucket.org/exotel/exotel_code/commonix/homeopathix/go/main.go`, add 
+
+    defer profile.Start(profile.CPUProfile).Stop()
+2. run `go`run`main.go`
+3. `go`tool`pprof`$PROFILE` 
+
+.link http://blog.golang.org/profiling-go-programs Further reading: Profiling Go programs
+.link https://software.intel.com/en-us/blogs/2014/05/10/debugging-performance-issues-in-go-programs Further reading: Debugging performance issues in Go programs
+
+
+* Profiling benchmarks
+
+The `testing` package has built in support for generating CPU, memory, and block profiles.
+
+- `-cpuprofile=$FILE` writes a CPU profile to `$FILE`. 
+- `-memprofile=$FILE`, writes a memory profile to `$FILE`, `-memprofilerate=N` adjusts the profile rate to `1/N`.
+- `-blockprofile=$FILE`, writes a block profile to `$FILE`.
+
+_Example_: Running benchmarks of the `bytes` package.
+
+    % go test -run=XXX -bench=. -cpuprofile=c.p bytes
+    % go tool pprof c.p
+
+_Note:_ use `-run=XXX` to disable tests, you only want to profile benchmarks. You can also use `-run=^$` to accomplish the same thing.
+
+
+* Memory management and GC
+
+* Memory management and GC
+
+Go is a garbage collected language. This is a design principle, it will not change.
+
+As a garbage collected language, the performance of Go programs is often determined by their interaction with the garbage collector.
+
+Next to your choice of algorithms, memory consumption is the most important factor that determines the performance and scalability of your application.
+
+This section discusses the operation of the garbage collector and strategies for lowering memory usage if garbage collector performance is a bottleneck.
+
+
+* Garbage collector design
+
+The design of the Go GC has changed over the years
+
+- Go 1.0, stop the world mark sweep collector based heavily on tcmalloc.
+- Go 1.3, fully precise collector, wouldn't mistake big numbers on the heap for pointers, thus leaking memory.
+- Go 1.5, new GC design, focusing on _latency_ over _throughput_.
+- Go 1.6, GC improvements, handling larger heaps with lower latency.
+- Go 1.7, small GC improvements, mainly refactoring.
+- Go 1.8–1.9, further work to reduce STW times, now down to the 100 microsecond range.
+- Go 1.10, ROC collector is an experiment to extend the idea of escape analysis per goroutine.
+
+
+* Garbage collector monitoring
+
+A simple way to obtain a general idea of how hard the garbage collector is working is to enable the output of GC logging.
+
+These stats are always collected, but normally suppressed, you can enable their display by setting the `GODEBUG` environment variable.
+
+ % env GODEBUG=gctrace=1 ./main
+ gc 1 @0.017s 8%: 0.021+3.2+0.10+0.15+0.86 ms clock, 0.043+3.2+0+2.2/0.002/0.009+1.7 ms cpu, 5->6->1 MB, 4 MB goal, 4 P
+ gc 2 @0.026s 12%: 0.11+4.9+0.12+1.6+0.54 ms clock, 0.23+4.9+0+3.0/0.50/0+1.0 ms cpu, 4->6->3 MB, 6 MB goal, 4 P
+ gc 3 @0.035s 14%: 0.031+3.3+0.76+0.17+0.28 ms clock, 0.093+3.3+0+2.7/0.012/0+0.84 ms cpu, 4->5->3 MB, 3 MB goal, 4 P
+ gc 4 @0.042s 17%: 0.067+5.1+0.15+0.29+0.95 ms clock, 0.20+5.1+0+3.0/0/0.070+2.8 ms cpu, 4->5->4 MB, 4 MB goal, 4 P
+ gc 5 @0.051s 21%: 0.029+5.6+0.33+0.62+1.5 ms clock, 0.11+5.6+0+3.3/0.006/0.002+6.0 ms cpu, 5->6->4 MB, 5 MB goal, 4 P
+ gc 6 @0.061s 23%: 0.080+7.6+0.17+0.22+0.45 ms clock, 0.32+7.6+0+5.4/0.001/0.11+1.8 ms cpu, 6->6->5 MB, 7 MB goal, 4 P
+ gc 7 @0.071s 25%: 0.59+5.9+0.017+0.15+0.96 ms clock, 2.3+5.9+0+3.8/0.004/0.042+3.8 ms cpu, 6->8->6 MB, 8 MB goal, 4 P
+
+The trace output gives a general measure of GC activity.
+
+DEMO: Show `Homeopathix` with `GODEBUG=gctrace=1` enabled
+
+_Recommendation_: use this env var in production, it has no performance impact.
+
+
+* Garbage collector tuning
+
+The Go runtime provides one environment variable to tune the GC, `GOGC`.
+
+The formula for GOGC is as follows.
+
+    goal = reachable * (1 + GOGC/100)
+
+For example, if we currently have a 256MB heap, and `GOGC=100` (the default), when the heap fills up it will grow to
+
+    512MB = 256MB * (1 + 100/100)
+
+- Values of `GOGC` greater than 100 causes the heap to grow faster, reducing the pressure on the GC.
+- Values of `GOGC` less than 100 cause the heap to grow slowly, increasing the pressure on the GC.
+
+The default value of 100 is _just_a_guide_. you should choose your own value _after_profiling_your_application_with_production_loads_.
+
+
+* Reduce allocations
+
+Make sure your APIs allow the caller to reduce the amount of garbage generated.
+
+Consider these two Read methods
+
+    func (r *Reader) Read() ([]byte, error)
+    func (r *Reader) Read(buf []byte) (int, error)
+
+The first Read method takes no arguments and returns some data as a `[]byte`. The second takes a `[]byte` buffer and returns the amount of bytes read.
+
+The first Read method will _always_ allocate a buffer, putting pressure on the GC. The second fills the buffer it was given.
+
+* Preallocate slices if the length is known
+
+Append is convenient, but wasteful.
+
+What is the capacity of `b` after we append one more item to it?
+
+.play examples/grow/grow.go /START OMIT/,/END OMIT/
+
+If you use the append pattern you could be copying a lot of data and creating a lot of garbage.
+
+
+* Preallocate slices if the length is known (cont.)
+
+If know know the length of the slice beforehand, then pre-allocate the target to avoid copying and to make sure the target is exactly the right size.
+
+_Before:_
+
+     var s []string
+     for _, v := range fn() {
+            s = append(s, v)
+     }
+     return s
+
+_After:_
+
+     vals := fn()
+     s := make([]string, len(vals))
+     for i, v := range vals {
+            s[i] = v
+     }
+     return s
+
+
+* Using sync.Pool
+
+The `sync` package comes with a `sync.Pool` type which is used to reuse common objects.
+
+`sync.Pool` has no fixed size or maximum capacity. You add to it and take from it until a GC happens, then it is emptied unconditionally.
+
+.code examples/syncpool/pool.go /START OMIT/,/END OMIT/
+
+*Warning*: `sync.Pool` is not a cache. It can and will be emptied _at_any_time_.
+
+Do not place important items in a `sync.Pool`, they will be discarded.
+
+
+* Conclusion
+
+* Follow SRE Principles 
+
+Start with the simplest possible code.
+
+_Measure_. Profile your code to identify the bottlenecks, _do_not_guess_.
+
+If performance is good, _stop_. You don't need to optimise everything, only the hottest parts of your code.
+
+As your application grows, or your traffic pattern evolves, the performance hot spots will change.
+
+Don't leave complex code that is not performance critical, rewrite it with simpler operations if the bottleneck moves elsewhere.
+
+Pay very close attention to allocations, avoid unnecessary allocation where possible.
+
+
+* And the Teacher's advice are 
+
+"I can make things very fast if they don't have to be correct."
+.caption Russ Cox
+
+"Readable means reliable"
+.caption Rob Pike
+
+Don't trade performance for reliability.
